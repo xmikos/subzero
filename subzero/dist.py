@@ -94,7 +94,8 @@ class build_exe(distutils.core.Command):
 
         scripts = copy(self.distribution.scripts)
         self.distribution.scripts = []
-        for required_directory in [self.build_temp, self.build_exe]:
+        build_exe_temp = '{}.temp'.format(self.build_exe)
+        for required_directory in [self.build_temp, self.build_exe, build_exe_temp]:
             shutil.rmtree(required_directory, ignore_errors=True)
             os.makedirs(required_directory, exist_ok=True)
 
@@ -144,23 +145,20 @@ class build_exe(distutils.core.Command):
         for executable in executables:
             rename_script(executable)
 
-        names = [executable.options['name'] for executable in executables]
         for executable in executables:
-            self._freeze(executable, self.build_temp, self.build_exe)
+            self._freeze(executable, self.build_temp, build_exe_temp)
 
+        ## TODO: Compare file hashes to make sure we haven't replaced files with a different version
+        names = [executable.options['name'] for executable in executables]
         for name in names[1:]:
             move_tree(
-                os.path.join(self.build_exe, name),
-                os.path.join(self.build_exe, names[0]))
+                os.path.join(build_exe_temp, name),
+                os.path.join(build_exe_temp, names[0]))
 
-        move_tree(os.path.join(self.build_exe, names[0]), self.build_exe)
+        move_tree(os.path.join(build_exe_temp, names[0]), self.build_exe)
 
         shutil.rmtree(self.build_temp, ignore_errors=True)
-
-        # TODO: Compare file hashes to make sure we haven't replaced files with a different version
-        for name in names:
-            shutil.rmtree(
-                os.path.join(self.build_exe, name), ignore_errors=True)
+        shutil.rmtree(build_exe_temp, ignore_errors=True)
 
     @make_spin(Spin1, 'Compiling module file locations...')
     def _compile_modules(self):
