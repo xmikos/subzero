@@ -112,7 +112,6 @@ class build_exe(distutils.core.Command):
             options.setdefault(default_option, [])
 
         # by convention, all paths appended to py_options must be absolute
-        options['hiddenimports'].extend(self.distribution.install_requires)
         for lib_dir in lib_dirs:
             if os.path.isdir(os.path.join(self.build_base, lib_dir)):
                 options['pathex'].append(
@@ -120,10 +119,6 @@ class build_exe(distutils.core.Command):
 
         if not options['pathex']:
             raise ValueError('Unable to find lib directory!')
-
-        if version.parse(sys.version[0:3]) >= version.parse('3.4'):
-            for package in self.distribution.packages:
-                options['hiddenimports'].extend(collect_submodules(package))
 
         options['specpath'] = os.path.abspath(self.build_temp)
         options['pathex'].append(os.path.abspath(self.build_temp))
@@ -236,9 +231,15 @@ class build_exe(distutils.core.Command):
         return module_files, binary_files
 
     def _discover_dependencies(self, options):
+        # Requirements cannot be assumed to be modules / packages
+        #options['hiddenimports'].extend(self.distribution.install_requires)
+
+        if version.parse(sys.version[0:3]) >= version.parse('3.4'):
+            for package in self.distribution.packages:
+                options['hiddenimports'].extend(collect_submodules(package))
+
         module_files = self._compile_modules()
-        required_module_files, required_binary_files = self._compile_requirements(
-        )
+        required_module_files, required_binary_files = self._compile_requirements()
 
         for required_file in required_module_files:
             try:
@@ -269,8 +270,6 @@ class build_exe(distutils.core.Command):
             fh.write("import {0}\n".format(entry_point.module_name))
             fh.write("{0}.{1}()\n".format(entry_point.module_name, '.'.join(
                 entry_point.attrs)))
-            for package in self.distribution.packages:
-                fh.write("import {0}\n".format(package))
 
             fh.seek(0)
             assert '==' not in fh.read()
